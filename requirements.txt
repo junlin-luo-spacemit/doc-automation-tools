@@ -1,0 +1,7 @@
+# Core dependencies for doc-automation-tools
+# Minimal for now, add as needed
+
+# For future tools that might need them:
+# pyyaml>=6.0
+# markdown>=3.4
+# requests>=2.31
