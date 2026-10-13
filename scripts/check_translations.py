@@ -7,12 +7,16 @@ Reports missing files, structure mismatches, and translation status.
 
 Usage:
     python check_translations.py <docs-repo-path>
-    python check_translations.py .
+    python check_translations.py . --summary
 """
 
 import sys
 from pathlib import Path
 from typing import Set, Dict, List, Tuple
+
+# Console codepages such as GBK cannot encode this report's output when piped.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 
 def get_doc_files(base_path: Path, lang: str) -> Set[Path]:
@@ -94,21 +98,36 @@ def check_translations(repo_path: str) -> Dict[str, any]:
     }
 
 
+def print_summary(result: Dict, label: str) -> None:
+    """Print a single aligned line, for scanning many repos at once."""
+    if "error" in result:
+        print(f"{label:<24} ERROR  {result['error']}")
+        return
+
+    stats = result["stats"]
+    flag = "OK " if stats["missing"] == 0 and stats["extra"] == 0 else "GAP"
+    print(
+        f"{label:<24} {flag}  {stats['coverage_pct']:>5.1f}%  "
+        f"zh={stats['total_zh']:<4} en={stats['total_en']:<4} "
+        f"missing={stats['missing']:<4} extra={stats['extra']}"
+    )
+
+
 def print_report(result: Dict) -> None:
     """Print human-readable report."""
     if "error" in result:
-        print(f"❌ Error: {result['error']}")
+        print(f"[ERROR] {result['error']}")
         return
     
     stats = result["stats"]
     
     print("=" * 70)
-    print("📊 TRANSLATION GAP REPORT")
+    print("TRANSLATION GAP REPORT")
     print("=" * 70)
     print(f"Repository: {result['base_path']}")
     print()
     
-    print("📈 Statistics:")
+    print("Statistics:")
     print(f"  Chinese files (zh/):    {stats['total_zh']}")
     print(f"  English files (en/):    {stats['total_en']}")
     print(f"  Fully matched:          {stats['translated']}")
@@ -118,36 +137,36 @@ def print_report(result: Dict) -> None:
     print()
     
     if result["missing_en_files"]:
-        print("❌ Missing English Translations:")
+        print("Missing English Translations:")
         for f in result["missing_en_files"]:
             print(f"  - {f}")
         print()
     
     if result["extra_en_files"]:
-        print("⚠️  Extra English Files (no Chinese source):")
+        print("Extra English Files (no Chinese source):")
         for f in result["extra_en_files"]:
             print(f"  - {f}")
         print()
     
     if result["missing_en_dirs"]:
-        print("📁 Missing English Directories:")
+        print("Missing English Directories:")
         for d in result["missing_en_dirs"]:
             print(f"  - {d}/")
         print()
     
     if result["extra_en_dirs"]:
-        print("📁 Extra English Directories:")
+        print("Extra English Directories:")
         for d in result["extra_en_dirs"]:
             print(f"  - {d}/")
         print()
     
     if not any([result["missing_en_files"], result["extra_en_files"], 
                 result["missing_en_dirs"], result["extra_en_dirs"]]):
-        print("✅ Perfect! All files are synchronized between zh/ and en/")
+        print("OK - all files are synchronized between zh/ and en/")
         print()
     
     print("=" * 70)
-    print("💡 Next Steps:")
+    print("Next Steps:")
     if result["missing_en_files"]:
         print("  1. Translate missing files")
         print("  2. Run this tool again to verify")
@@ -159,14 +178,20 @@ def print_report(result: Dict) -> None:
 
 
 def main():
-    if len(sys.argv) < 2:
-        print("Usage: python check_translations.py <docs-repo-path>")
+    args = [a for a in sys.argv[1:] if not a.startswith("-")]
+    summary = "--summary" in sys.argv[1:]
+
+    if not args:
+        print("Usage: python check_translations.py <docs-repo-path> [--summary]")
         print("Example: python check_translations.py ~/docs-product")
         sys.exit(1)
     
-    repo_path = sys.argv[1]
+    repo_path = args[0]
     result = check_translations(repo_path)
-    print_report(result)
+    if summary:
+        print_summary(result, Path(repo_path).resolve().name)
+    else:
+        print_report(result)
     
     # Exit code indicates if there are gaps
     if "error" in result:
