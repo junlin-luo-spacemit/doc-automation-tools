@@ -5,6 +5,13 @@ $ErrorActionPreference = 'Stop'
 $toolsRoot = $PSScriptRoot
 $reposRoot = Split-Path $toolsRoot -Parent
 
+$pythonExe = (Get-Command python -ErrorAction SilentlyContinue).Source
+if (-not $pythonExe) {
+    Write-Host '  [ERROR] python not found on PATH.' -ForegroundColor Red
+    Read-Host '  Enter to exit' | Out-Null
+    exit 1
+}
+
 function Get-DocRepos {
     Get-ChildItem $reposRoot -Directory -ErrorAction SilentlyContinue |
         Where-Object { (Test-Path (Join-Path $_.FullName '.git')) -and $_.Name -ne 'doc-automation-tools' } |
@@ -68,6 +75,7 @@ function Invoke-CheckAll {
 }
 
 while ($true) {
+  try {
     Show-Header
     $repos = @(Get-DocRepos)
     Write-Host "  $($repos.Count) bilingual repos detected" -ForegroundColor DarkGray
@@ -103,4 +111,11 @@ while ($true) {
         'Q' { return }
         default { }
     }
+  }
+  catch {
+    Write-Host ''
+    Write-Host "  [ERROR] $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host ''
+    Read-Host '  Enter to continue' | Out-Null
+  }
 }
