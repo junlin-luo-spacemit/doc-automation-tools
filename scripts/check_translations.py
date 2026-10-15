@@ -8,6 +8,7 @@ Reports missing files, structure mismatches, and translation status.
 Usage:
     python check_translations.py <docs-repo-path>
     python check_translations.py . --summary
+    python check_translations.py . --claims   # handoff table for the review AI
 """
 
 import sys
@@ -17,6 +18,30 @@ from typing import Set, Dict, List, Tuple
 # Console codepages such as GBK cannot encode this report's output when piped.
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
+
+def get_empty_files(base_path: Path, lang: str) -> List[Path]:
+    """Zero-byte .md files. Placeholders that silently pass a presence check."""
+    lang_dir = base_path / lang
+    if not lang_dir.exists():
+        return []
+    return sorted(
+        f.relative_to(lang_dir)
+        for f in lang_dir.rglob("*.md")
+        if f.stat().st_size == 0
+    )
+
+
+def count_headings(base_path: Path, lang: str) -> int:
+    """Count lines starting with # as a rough size-parity signal, not a structure check."""
+    lang_dir = base_path / lang
+    if not lang_dir.exists():
+        return 0
+    total = 0
+    for md_file in lang_dir.rglob("*.md"):
+        with open(md_file, encoding="utf-8", errors="replace") as fh:
+            total += sum(1 for line in fh if line.lstrip().startswith("#"))
+    return total
 
 
 def get_doc_files(base_path: Path, lang: str) -> Set[Path]:
@@ -87,6 +112,10 @@ def check_translations(repo_path: str) -> Dict[str, any]:
         "extra_en_files": sorted([str(f) for f in extra_en_files]),
         "missing_en_dirs": sorted([str(d) for d in missing_en_dirs]),
         "extra_en_dirs": sorted([str(d) for d in extra_en_dirs]),
+        "empty_zh_files": [str(f) for f in get_empty_files(base, "zh")],
+        "empty_en_files": [str(f) for f in get_empty_files(base, "en")],
+        "headings_zh": count_headings(base, "zh"),
+        "headings_en": count_headings(base, "en"),
         "stats": {
             "total_zh": total_zh,
             "total_en": total_en,
@@ -177,18 +206,109 @@ def print_report(result: Dict) -> None:
     print("=" * 70)
 
 
+def print_claims(result: Dict, label: str) -> None:
+    """Emit a handoff claims table for the review AI.
+
+    Deterministic facts only, each paired with the command that reproduces it.
+    Translation fidelity is out of scope here and must be reviewed by reading.
+    """
+    if "error" in result:
+        print(f"[ERROR] {result['error']}")
+        return
+
+    stats = result["stats"]
+    rows = [
+        ("zh/ .md file count",
+         f"Get-ChildItem {label}\\zh -Recurse -Filter *.md | Measure-Object",
+         str(stats["total_zh"])),
+        ("en/ .md file count",
+         f"Get-ChildItem {label}\\en -Recurse -Filter *.md | Measure-Object",
+         str(stats["total_en"])),
+        ("matched pairs",
+         "compare the two listings above",
+         str(stats["translated"])),
+        ("missing translations",
+         "see list below",
+         str(stats["missing"])),
+        ("extra English files",
+         "see list below",
+         str(stats["extra"])),
+        ("empty zh/ files",
+         f"Get-ChildItem {label}\\zh -Recurse -Filter *.md | Where-Object Length -eq 0",
+         str(len(result["empty_zh_files"]))),
+        ("empty en/ files",
+         f"Get-ChildItem {label}\\en -Recurse -Filter *.md | Where-Object Length -eq 0",
+         str(len(result["empty_en_files"]))),
+        ("zh heading lines",
+         f'Select-String -Path {label}\\zh\\*.md -Pattern "^#" -AllMatches | Measure-Object',
+         str(result["headings_zh"])),
+        ("en heading lines",
+         f'Select-String -Path {label}\\en\\*.md -Pattern "^#" -AllMatches | Measure-Object',
+         str(result["headings_en"])),
+    ]
+
+    print("=" * 70)
+    print(f"REVIEW HANDOFF - {label}")
+    print("=" * 70)
+    print("Reviewer: reproduce every claim below with the given command.")
+    print("Do not accept a claim by reading it. Any unverified row blocks PASS.")
+    print()
+    print("| # | Claim | Reproduce with | Expected | Verified |")
+    print("|---|-------|----------------|----------|----------|")
+    for i, (claim, cmd, expected) in enumerate(rows, 1):
+        print(f"| {i} | {claim} | `{cmd}` | {expected} | |")
+    print()
+
+    if result["empty_zh_files"]:
+        print("Empty zh/ files (placeholders - a presence check passes them silently):")
+        for f in result["empty_zh_files"]:
+            print(f"  - zh/{f}")
+        print()
+
+    if result["empty_en_files"]:
+        print("Empty en/ files:")
+        for f in result["empty_en_files"]:
+            print(f"  - en/{f}")
+        print()
+
+    if result["missing_en_files"]:
+        print("Missing English translations:")
+        for f in result["missing_en_files"]:
+            print(f"  - {f}")
+        print()
+
+    if result["extra_en_files"]:
+        print("Extra English files (no Chinese source to verify against):")
+        for f in result["extra_en_files"]:
+            print(f"  - {f}")
+        print()
+
+    print("-" * 70)
+    print("Out of scope for this table (reviewer must check by reading):")
+    print("  - translation fidelity of any matched pair")
+    print("  - image and link targets resolving to real files")
+    print("  - terminology and tone consistency")
+    print("  - whether heading totals reflect real structural parity")
+    print("-" * 70)
+    print("Verdict (reviewer fills in): PASS / PASS WITH GAPS / FAIL")
+    print("=" * 70)
+
+
 def main():
     args = [a for a in sys.argv[1:] if not a.startswith("-")]
     summary = "--summary" in sys.argv[1:]
+    claims = "--claims" in sys.argv[1:]
 
     if not args:
-        print("Usage: python check_translations.py <docs-repo-path> [--summary]")
+        print("Usage: python check_translations.py <docs-repo-path> [--summary|--claims]")
         print("Example: python check_translations.py ~/docs-product")
         sys.exit(1)
     
     repo_path = args[0]
     result = check_translations(repo_path)
-    if summary:
+    if claims:
+        print_claims(result, Path(repo_path).resolve().name)
+    elif summary:
         print_summary(result, Path(repo_path).resolve().name)
     else:
         print_report(result)

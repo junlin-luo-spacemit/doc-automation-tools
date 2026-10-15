@@ -1,164 +1,73 @@
 # RSI Roadmap
 
-## Philosophy
+## What RSI actually is (corrected 2026-10-15)
 
-This system follows **Recursive Self-Improvement (RSI)** principles:
+RSI means **the agent gets better at this job every time it does the job.**
 
-1. Build one tool at a time
-2. Use it until patterns emerge
-3. Let real usage drive the next tool
-4. Each tool makes building the next one easier
+The mechanism is **lesson capture**, not tool-building:
 
-**Don't build ahead. Build what's needed, informed by what's used.**
+1. Doing real work surfaces a surprise, a mistake, or a non-obvious constraint
+2. That rule gets written into memory immediately, during the job
+3. Future work reads the rule instead of re-deriving it
+4. Mistakes stop repeating; each job starts from a higher floor
 
----
+**Scripts in this repo are not the RSI.** They are a side-effect, worth building
+only when a captured lesson is mechanical enough to enforce automatically.
 
-## Phase 1: Translation Gap Finder ✅
+### The failure mode this repo already hit
 
-**Status:** Live and testing
+Between 2026-10-10 and 2026-10-13 the work was: build a script, build a launcher,
+log the script changes, call it improvement. A re-scan on 2026-10-15 returned
+byte-identical numbers across all 18 repos — proof the tool was being *built*,
+not *used*.
 
-**What it does:**
-- Scans zh/ and en/ directories
-- Reports missing translations
-- Shows structure mismatches
-- Calculates coverage percentage
+**A loop that only improves the tool, and never touches the real job, is a fake loop.**
 
-**Tool:** `scripts/check_translations.py`
-
-**Trigger phrases for Phase 2:**
-- "links keep breaking"
-- "images missing"
-- "formatting inconsistent"
-- "terminology all over the place"
-- "build next tool"
+Real improvement from the same period lives in the agent's repo-conventions
+memory, not here: image paths are case-sensitive, squash-merge looks like
+divergence, prose-only product-name checks, `-UseBasicParsing` on PS 5.1.
+Those stop recurring costs on every future task.
 
 ---
 
-## Phase 2: Content Validator
+## Tools
 
-**Status:** Not started - waiting for Phase 1 insights
+### check_translations.py
 
-**What it will do** (tentative, may change based on actual needs):
-- Validate internal links
-- Check image references
-- Verify formatting consistency
-- Style guide compliance
-- Terminology consistency
+Scans `zh/` and `en/`, reports missing translations, structure mismatches, and
+coverage percentage.
 
-**Will build when:**
-- Phase 1 has been used across multiple repos
-- Clear validation pain points emerge
-- User reports manual checking friction
+```bash
+python scripts/check_translations.py <repo-path>            # full report
+python scripts/check_translations.py <repo-path> --summary  # one line
+```
 
-**Trigger phrases for Phase 3:**
-- "can you auto-fix this?"
-- "tired of fixing manually"
-- "generate templates"
-- "automate the fixes"
+Launchers: `check-all.bat` (scan every bilingual repo, zero input),
+`rsi.bat` (interactive menu).
+
+**Known gotcha:** the Windows console is GBK. Never emit emoji from these
+scripts — it raises `UnicodeEncodeError` when output is piped. Fixed via
+`sys.stdout.reconfigure` plus ASCII markers.
 
 ---
 
-## Phase 3: Auto-Fixer & Generator
+## When to build another tool
 
-**Status:** Not started - depends on Phase 2 findings
+Not on a schedule, and not by phase number. Build only when **all** hold:
 
-**What it might do:**
-- Auto-fix common issues found by Phase 2
-- Generate boilerplate from templates
-- Suggest translations for repeated terms
-- Batch corrections
+1. A lesson has been captured from real work
+2. It is mechanically checkable
+3. The manual version has actually been done more than once
 
-**Will build when:**
-- Phase 2 reveals fixable patterns
-- Manual fixing becomes repetitive
-- Clear automation opportunities emerge
-
-**Trigger phrases for Phase 4:**
-- "show me patterns"
-- "what's most broken?"
-- "analytics time"
-- "track improvements"
+Otherwise the right move is to record the rule in memory and move on.
 
 ---
 
-## Phase 4: Analytics & Insights
+## Open questions from the last scan
 
-**Status:** Not started - depends on usage data
-
-**What it might do:**
-- Track what issues appear most
-- Measure time saved
-- Identify documentation debt
-- Suggest next automations
-- Generate reports
-
-**Will build when:**
-- Multiple tools generate useful data
-- Need to prioritize improvements
-- Want to measure impact
-
-**Trigger phrases for Phase 5:**
-- "tool to build tools"
-- "meta level"
-- "workflow optimizer"
-
----
-
-## Phase 5: Meta-Tools
-
-**Status:** Conceptual - far future
-
-**What it might do:**
-- Tools that generate new tools
-- Workflow optimization
-- Template-based tool creation
-- True RSI: tools building tools
-
-**Will build when:**
-- Clear patterns in tool structure emerge
-- Enough tools exist to abstract
-- Need to accelerate tool creation
-
----
-
-## How to Move Forward
-
-### You Tell Me When Ready:
-
-**Simple triggers:**
-- "ready for Phase X"
-- "build next tool"
-- "let's move forward"
-
-**Or describe your pain:**
-- "I keep doing X manually"
-- "This is getting repetitive"
-- "Can we automate Y?"
-
-### I'll Suggest When:
-
-- You report friction multiple times
-- Clear patterns emerge from your work
-- Tool logs reveal opportunities
-- But only after real usage, never prematurely
-
----
-
-## Design Principles
-
-1. **Start minimal** - Solve one problem well
-2. **Use immediately** - Test on real repos right away
-3. **Iterate fast** - Fix and improve based on feedback
-4. **Build on success** - Each tool informs the next
-5. **Stay focused** - Don't add features that aren't needed
-6. **Measure impact** - Know what's working
-
----
-
-## Current Testing
-
-- [x] docs-product: 100% translation coverage ✅
-- [ ] docs-ros: Not tested yet
-- [ ] Other repos: Not tested yet
-
-**Next action:** Use Phase 1 across all repos for 1-2 weeks, note friction points.
+- `docs-chip` and `docs-chip-pr-clean` each report 55 extra EN files —
+  intentional English-only docs, or a real gap?
+- Is `docs-chip-pr-clean` a scratch copy that should be excluded from scans?
+- Of the 178 missing translations across 18 repos, how many are live work
+  versus archived repos? If mostly archived, the tool reports noise and needs
+  an ignore list.

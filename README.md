@@ -27,73 +27,52 @@ pip install -r requirements.txt
 
 ## Quick Start
 
+Double-click `check-all.bat` to scan every bilingual repo at once (no input
+needed), or `rsi.bat` for an interactive menu.
+
+From a shell:
+
 ```bash
-# Check translation gaps in any docs repo
+# Full report for one repo
 python scripts/check_translations.py /path/to/docs-repo
 
-# Example: Use in docs-product
-cd ~/docs-product
-python ~/doc-automation-tools/scripts/check_translations.py .
+# One line per repo, for scanning many
+python scripts/check_translations.py /path/to/docs-repo --summary
 ```
 
 ## Tools
 
-### 1. Translation Gap Finder (`check_translations.py`)
+### Translation Gap Finder (`scripts/check_translations.py`)
 Scans zh/ and en/ folders to find:
 - Missing translations
 - Structure mismatches
-- Incomplete documentation
+- Coverage percentage
 
-**Usage:**
-```bash
-python scripts/check_translations.py <repo-path>
-```
+### Launchers
+- `check-all.bat` — scans every bilingual repo found next to this one, zero input
+- `rsi.bat` — interactive menu (check one repo, check all, list repos)
 
-## VS Code Integration
+Both auto-detect repos, so a newly cloned docs repo shows up with no config.
 
-Add to your docs repo's `.vscode/tasks.json`:
-```json
-{
-  "version": "2.0.0",
-  "tasks": [
-    {
-      "label": "Check Translations",
-      "type": "shell",
-      "command": "python",
-      "args": [
-        "${env:HOME}/doc-automation-tools/scripts/check_translations.py",
-        "${workspaceFolder}"
-      ],
-      "group": "test",
-      "presentation": {
-        "echo": true,
-        "reveal": "always",
-        "panel": "new"
-      }
-    }
-  ]
-}
-```
+## Gotcha
 
-Then run with `Ctrl+Shift+B` or Command Palette → "Tasks: Run Task".
+The Windows console is GBK. **Never emit emoji from these scripts** — it raises
+`UnicodeEncodeError` as soon as output is piped. Handled via
+`sys.stdout.reconfigure` plus ASCII status markers.
+
 
 ## RSI Philosophy
 
-Each tool:
-1. Solves a real problem
-2. Reveals new patterns
-3. Informs the next tool
-4. Compounds your productivity
+RSI here means **the agent gets better at this job every time it does the job.**
+The mechanism is capturing lessons into agent memory during real work, so a
+mistake or a non-obvious constraint is never re-derived.
 
-Build → Use → Learn → Improve → Repeat
+These scripts are a *side-effect* of that process, not the process itself. A
+script is only worth writing when a captured lesson is mechanical enough to
+enforce automatically.
 
-## Roadmap
-
-- [x] Phase 1: Translation gap finder
-- [ ] Phase 2: Content validator (links, images, formatting)
-- [ ] Phase 3: Auto-fixer and generators
-- [ ] Phase 4: Analytics and insights
-- [ ] Phase 5: Meta-tools (tools that build tools)
+See [ROADMAP.md](ROADMAP.md) for the full definition, the failure mode this
+repo already hit, and the bar a new tool has to clear.
 
 ## License
 
